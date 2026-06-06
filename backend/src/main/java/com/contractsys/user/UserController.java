@@ -37,6 +37,7 @@ public class UserController {
         this.roleRepository = roleRepository;
         this.authService = authService;
         this.passwordEncoder = passwordEncoder;
+        this.operationLogService = operationLogService;
     }
 
     @GetMapping

@@ -30,6 +30,7 @@ public class RoleController {
         this.roleRepository = roleRepository;
         this.permissionRepository = permissionRepository;
         this.authService = authService;
+        this.operationLogService = operationLogService;
     }
 
     @GetMapping

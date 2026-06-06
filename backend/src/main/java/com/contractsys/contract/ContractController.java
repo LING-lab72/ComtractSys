@@ -225,7 +225,7 @@ public class ContractController {
     public ApiResponse<Void> cancel(@PathVariable Long id) {
         SysUser user = authService.requireUser();
         contractService.cancel(id, user);
-        return ApiResponse.ok("合同已取消");
+        return ApiResponse.ok(null);
     }
 
     @GetMapping("/statistics")
