@@ -1,21 +1,24 @@
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import {
   ClipboardList, FilePlus2, UsersRound, Handshake, LogOut,
   LayoutDashboard, Settings, ShieldCheck, UserCog, ScrollText, ChevronDown
 } from 'lucide-vue-next'
 import { useAuthStore } from '../stores/auth'
+import { api } from '../api'
 
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
+const pendingTaskCount = ref(0)
 
 const menuItems = [
   { path: '/dashboard', label: '工作台', icon: LayoutDashboard },
   { path: '/contracts', label: '合同管理', icon: ClipboardList, permission: 'contract:view' },
-  { path: '/contracts/create', label: '起草合同', icon: FilePlus2, permission: 'contract:create' },
-  { path: '/tasks', label: '我的待办', icon: Handshake, anyPermission: ['contract:countersign', 'contract:approve', 'contract:sign', 'contract:update'] },
+  { path: '/contracts/create', label: '起草合同', icon: FilePlus2, permission: 'contract:create', hidden: true },
+  { path: '/contracts/query', label: '合同查询', icon: ScrollText, permission: 'log:view' },
+  { path: '/tasks', label: '我的待办', icon: Handshake, anyPermission: ['contract:countersign', 'contract:approve', 'contract:sign', 'contract:update', 'contract:assign'] },
   { path: '/customers', label: '客户管理', icon: UsersRound, permission: 'customer:manage' },
 ]
 
@@ -32,6 +35,18 @@ function canAccess(item) {
   return true
 }
 
+const canViewTasks = computed(() =>
+  auth.permissions.some(p => ['contract:countersign', 'contract:approve', 'contract:sign', 'contract:update', 'contract:assign'].includes(p))
+)
+
+async function loadPendingCount() {
+  if (!canViewTasks.value) return
+  try {
+    const res = await api.get('/tasks/my')
+    pendingTaskCount.value = res.data.length
+  } catch { pendingTaskCount.value = 0 }
+}
+
 const hasSystemAccess = computed(() =>
   auth.permissions.some(p => ['user:manage', 'role:manage', 'permission:manage', 'log:view'].includes(p))
 )
@@ -43,7 +58,7 @@ watch(() => route.path, (path) => {
 })
 
 function isActive(path) {
-  if (path === '/contracts' && route.path.startsWith('/contracts')) return true
+  if (path === '/contracts' && route.path.startsWith('/contracts') && !route.path.startsWith('/contracts/query')) return true
   return route.path === path
 }
 
@@ -51,6 +66,10 @@ function logout() {
   auth.logout()
   router.push('/login')
 }
+
+let timer
+onMounted(() => { loadPendingCount(); timer = setInterval(loadPendingCount, 30000) })
+onUnmounted(() => clearInterval(timer))
 </script>
 
 <template>
@@ -63,12 +82,13 @@ function logout() {
       <nav>
         <button
           v-for="item in menuItems" :key="item.path"
-          v-show="canAccess(item)"
+          v-show="canAccess(item) && !item.hidden"
           :class="{ selected: isActive(item.path) }"
           @click="router.push(item.path)"
         >
           <component :is="item.icon" :size="18" />
           {{ item.label }}
+          <span v-if="item.path === '/tasks' && pendingTaskCount > 0" class="badge">{{ pendingTaskCount }}</span>
         </button>
 
         <div v-if="hasSystemAccess" class="sys-group">

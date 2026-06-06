@@ -25,7 +25,7 @@ const assignForm = reactive({
 })
 
 function statusLabel(s) {
-  const map = { DRAFT:'起草', ASSIGNED:'已分配', COUNTERSIGNED:'会签完成', FINALIZED:'已定稿', APPROVED:'已审批', SIGNED:'已签订', REJECTED:'已拒绝', CANCELLED:'已取消' }
+  const map = { DRAFT:'待分配', ASSIGNED:'待会签', COUNTERSIGNED:'会签完成', FINALIZED:'已定稿', APPROVED:'已审批', SIGNED:'已签订', REJECTED:'已拒绝', CANCELLED:'已取消' }
   return map[s] || s
 }
 
@@ -67,7 +67,8 @@ async function loadUsers() {
   if (!hasPermission('contract:assign')) return
   try {
     const res = await api.get('/users/assignable')
-    users.value = res.data
+    // 从备选列表中移除草人
+    users.value = (res.data || []).filter(u => u.id !== contract.value?.drafterId)
   } catch {}
 }
 
@@ -251,10 +252,10 @@ onMounted(() => { loadDetail(); loadUsers(); loadAttachments() })
           <button v-if="hasPermission('contract:update') && contract.status === 'REJECTED'" @click="doResubmit">
             <RotateCcw :size="14" /> 重新提交审批
           </button>
-          <button v-if="hasPermission('contract:approve') && contract.status === 'FINALIZED'" @click="doApprove('APPROVED')">审批通过</button>
-          <button v-if="hasPermission('contract:approve') && contract.status === 'FINALIZED'" @click="doApprove('REJECTED')">审批拒绝</button>
+          <button v-if="hasPermission('contract:approve') && contract.status === 'FINALIZED' && hasPendingTask" @click="doApprove('APPROVED')">审批通过</button>
+          <button v-if="hasPermission('contract:approve') && contract.status === 'FINALIZED' && hasPendingTask" @click="doApprove('REJECTED')">审批拒绝</button>
           <button v-if="hasPermission('contract:countersign') && contract.status === 'ASSIGNED' && hasPendingTask" @click="doCountersign">会签</button>
-          <button v-if="hasPermission('contract:sign') && contract.status === 'APPROVED'" @click="doSign">签订</button>
+          <button v-if="hasPermission('contract:sign') && contract.status === 'APPROVED' && hasPendingTask" @click="doSign">签订</button>
           <button v-if="hasPermission('contract:delete') && contract.status !== 'SIGNED' && contract.status !== 'CANCELLED'" @click="doCancel" style="color:#cc0000">
             <XCircle :size="14" /> 取消合同
           </button>
@@ -283,7 +284,7 @@ onMounted(() => { loadDetail(); loadUsers(); loadAttachments() })
 
       <div v-if="activeTab === 'attachments'" class="tab-content">
         <div style="margin-bottom:14px">
-          <label v-if="hasPermission('contract:update')" class="secondary" style="display:inline-flex;cursor:pointer;min-height:38px;align-items:center;gap:8px;padding:0 14px;border-radius:6px;font-weight:700">
+          <label v-if="hasPermission('contract:update') && contract.status !== 'DRAFT'" class="secondary" style="display:inline-flex;cursor:pointer;min-height:38px;align-items:center;gap:8px;padding:0 14px;border-radius:6px;font-weight:700">
             <Upload :size="16" />
             {{ uploading ? '上传中...' : '选择文件' }}
             <input type="file" hidden accept=".doc,.docx,.jpg,.jpeg,.png,.bmp,.gif,.pdf" @change="handleUpload" :disabled="uploading" />

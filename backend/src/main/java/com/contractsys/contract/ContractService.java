@@ -1,5 +1,6 @@
 package com.contractsys.contract;
 
+import com.contractsys.auth.AuthService;
 import com.contractsys.common.ApiException;
 import com.contractsys.common.PageRequests;
 import com.contractsys.contract.dto.*;
@@ -13,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -23,18 +25,20 @@ public class ContractService {
     private final ContractStateHistoryRepository stateHistoryRepository;
     private final CustomerRepository customerRepository;
     private final UserRepository userRepository;
+    private final AuthService authService;
 
     public ContractService(ContractRepository contractRepository, ContractTaskRepository taskRepository,
                            ContractStateHistoryRepository stateHistoryRepository, CustomerRepository customerRepository,
-                           UserRepository userRepository) {
+                           UserRepository userRepository, AuthService authService) {
         this.contractRepository = contractRepository;
         this.taskRepository = taskRepository;
         this.stateHistoryRepository = stateHistoryRepository;
         this.customerRepository = customerRepository;
         this.userRepository = userRepository;
+        this.authService = authService;
     }
 
-    public Page<ContractView> list(String keyword, String statusStr, int page, int size) {
+    public Page<ContractView> list(String keyword, String statusStr, int page, int size, String scope, SysUser currentUser) {
         ContractStatus status = null;
         if (statusStr != null && !statusStr.isEmpty()) {
             try {
@@ -43,10 +47,31 @@ public class ContractService {
                 throw ApiException.badRequest("合同状态不合法: " + statusStr);
             }
         }
-        return contractRepository.search(
-                keyword == null ? "" : keyword, status,
-                PageRequests.of(page, size)
-        ).map(ContractView::from);
+        Page<Contract> result;
+        String kw = keyword == null ? "" : keyword;
+        var pr = PageRequests.of(page, size);
+        if ("all".equals(scope) && authService.hasPermission(currentUser, "log:view")) {
+            result = contractRepository.search(kw, status, pr);
+        } else {
+            result = contractRepository.searchByRelatedUser(kw, status, currentUser.getId(), pr);
+        }
+        return result.map(ContractView::from);
+    }
+
+    public Page<ContractView> queryAll(String keyword, String statusStr, int page, int size, SysUser currentUser) {
+        if (!authService.hasPermission(currentUser, "log:view")) {
+            throw ApiException.forbidden("无权访问合同查询功能");
+        }
+        ContractStatus status = null;
+        if (statusStr != null && !statusStr.isEmpty()) {
+            try {
+                status = ContractStatus.valueOf(statusStr);
+            } catch (IllegalArgumentException ex) {
+                throw ApiException.badRequest("合同状态不合法: " + statusStr);
+            }
+        }
+        return contractRepository.search(keyword == null ? "" : keyword, status, PageRequests.of(page, size))
+                .map(ContractView::from);
     }
 
     public ContractDetailView detail(Long id) {
@@ -97,7 +122,27 @@ public class ContractService {
     }
 
     public List<TaskView> myTasks(SysUser user) {
-        return taskRepository.findByAssigneeAndTaskStatus(user, TaskStatus.PENDING).stream().map(TaskView::from).toList();
+        List<TaskView> tasks = new ArrayList<>(
+                taskRepository.findByAssigneeAndTaskStatus(user, TaskStatus.PENDING).stream()
+                        .map(TaskView::from).toList());
+
+        // 待分配：有 contract:assign 权限时，显示草稿状态的合同
+        if (authService.hasPermission(user, "contract:assign")) {
+            contractRepository.findByStatusAndDeletedFalse(ContractStatus.DRAFT).forEach(c -> {
+                tasks.add(TaskView.pseudo(c.getId(), c.getName(), TaskType.ASSIGN,
+                        "待分配给会签/审批/签订人员", c.getDrafter().getDisplayName()));
+            });
+        }
+
+        // 待定稿：起草人可以看到会签完成的合同
+        contractRepository.findByStatusAndDeletedFalse(ContractStatus.COUNTERSIGNED).forEach(c -> {
+            if (c.getDrafter().getId().equals(user.getId())) {
+                tasks.add(TaskView.pseudo(c.getId(), c.getName(), TaskType.FINALIZE,
+                        "会签已完成，请完成定稿", c.getDrafter().getDisplayName()));
+            }
+        });
+
+        return tasks;
     }
 
     @Transactional

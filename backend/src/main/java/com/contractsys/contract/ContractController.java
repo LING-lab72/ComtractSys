@@ -44,9 +44,20 @@ public class ContractController {
     public ApiResponse<PageResponse<ContractView>> list(@RequestParam(defaultValue = "") String keyword,
                                                         @RequestParam(defaultValue = "") String status,
                                                         @RequestParam(defaultValue = "1") int page,
-                                                        @RequestParam(defaultValue = "10") int size) {
-        authService.requireUser();
-        return ApiResponse.ok(PageResponse.from(contractService.list(keyword, status, page, size)));
+                                                        @RequestParam(defaultValue = "10") int size,
+                                                        @RequestParam(defaultValue = "") String scope) {
+        SysUser user = authService.requireUser();
+        return ApiResponse.ok(PageResponse.from(contractService.list(keyword, status, page, size, scope, user)));
+    }
+
+    @GetMapping("/contracts/query")
+    @RequirePermission("log:view")
+    public ApiResponse<PageResponse<ContractView>> queryAll(@RequestParam(defaultValue = "") String keyword,
+                                                             @RequestParam(defaultValue = "") String status,
+                                                             @RequestParam(defaultValue = "1") int page,
+                                                             @RequestParam(defaultValue = "10") int size) {
+        SysUser user = authService.requireUser();
+        return ApiResponse.ok(PageResponse.from(contractService.queryAll(keyword, status, page, size, user)));
     }
 
     @GetMapping("/contracts/{id}")

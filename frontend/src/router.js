@@ -7,6 +7,7 @@ import DashboardView from './views/DashboardView.vue'
 import ContractListView from './views/ContractListView.vue'
 import ContractCreateView from './views/ContractCreateView.vue'
 import ContractDetailView from './views/ContractDetailView.vue'
+import ContractQueryView from './views/ContractQueryView.vue'
 import CustomerListView from './views/CustomerListView.vue'
 import MyTasksView from './views/MyTasksView.vue'
 import UserManagementView from './views/system/UserManagementView.vue'
@@ -33,6 +34,7 @@ const router = createRouter({
         { path: 'dashboard', component: DashboardView, meta: { title: '工作台' } },
         { path: 'contracts', component: ContractListView, meta: { title: '合同管理', permission: 'contract:view' } },
         { path: 'contracts/create', component: ContractCreateView, meta: { title: '起草合同', permission: 'contract:create' } },
+        { path: 'contracts/query', component: ContractQueryView, meta: { title: '合同查询', permission: 'log:view' } },
         { path: 'contracts/:id', component: ContractDetailView, meta: { title: '合同详情', permission: 'contract:view' } },
         { path: 'customers', component: CustomerListView, meta: { title: '客户管理', permission: 'customer:manage' } },
         { path: 'tasks', component: MyTasksView, meta: { title: '我的待办', permission: ['contract:countersign', 'contract:approve', 'contract:sign', 'contract:update'] } },
