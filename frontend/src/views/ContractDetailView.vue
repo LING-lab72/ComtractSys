@@ -1,7 +1,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, UserCheck, Paperclip, Download, Trash2, Upload, RotateCcw } from 'lucide-vue-next'
+import { ArrowLeft, UserCheck, Paperclip, Download, Trash2, Upload, RotateCcw, XCircle } from 'lucide-vue-next'
 import { api } from '../api'
 import { useAuthStore } from '../stores/auth'
 
@@ -25,7 +25,7 @@ const assignForm = reactive({
 })
 
 function statusLabel(s) {
-  const map = { DRAFT:'起草', ASSIGNED:'已分配', COUNTERSIGNED:'会签完成', FINALIZED:'已定稿', APPROVED:'已审批', SIGNED:'已签订', REJECTED:'已拒绝' }
+  const map = { DRAFT:'起草', ASSIGNED:'已分配', COUNTERSIGNED:'会签完成', FINALIZED:'已定稿', APPROVED:'已审批', SIGNED:'已签订', REJECTED:'已拒绝', CANCELLED:'已取消' }
   return map[s] || s
 }
 
@@ -142,6 +142,17 @@ async function doResubmit() {
   }
 }
 
+async function doCancel() {
+  if (!confirm('确认取消该合同？取消后不可恢复。')) return
+  try {
+    await api.post(`/contracts/${route.params.id}/cancel`)
+    success.value = '合同已取消'
+    await loadDetail()
+  } catch (err) {
+    error.value = err.message
+  }
+}
+
 async function handleUpload(e) {
   const file = e.target.files[0]
   if (!file) return
@@ -186,7 +197,7 @@ async function deleteAttachment(a) {
   }
 }
 
-const hasPendingTask = computed(() => tasks.value.some(t => t.taskStatus === 'PENDING' && t.assigneeId === auth.user?.id))
+const hasPendingTask = computed(() => tasks.value.some(t => t.taskStatus === 'PENDING' && t.assigneeId === Number(auth.user?.id)))
 
 onMounted(() => { loadDetail(); loadUsers(); loadAttachments() })
 </script>
@@ -244,6 +255,9 @@ onMounted(() => { loadDetail(); loadUsers(); loadAttachments() })
           <button v-if="hasPermission('contract:approve') && contract.status === 'FINALIZED'" @click="doApprove('REJECTED')">审批拒绝</button>
           <button v-if="hasPermission('contract:countersign') && contract.status === 'ASSIGNED' && hasPendingTask" @click="doCountersign">会签</button>
           <button v-if="hasPermission('contract:sign') && contract.status === 'APPROVED'" @click="doSign">签订</button>
+          <button v-if="hasPermission('contract:delete') && contract.status !== 'SIGNED' && contract.status !== 'CANCELLED'" @click="doCancel" style="color:#cc0000">
+            <XCircle :size="14" /> 取消合同
+          </button>
         </div>
       </div>
 

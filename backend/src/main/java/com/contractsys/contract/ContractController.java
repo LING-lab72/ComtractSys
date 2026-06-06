@@ -220,6 +220,14 @@ public class ContractController {
         return ApiResponse.ok(contractService.resubmit(id, user));
     }
 
+    @PostMapping("/contracts/{id}/cancel")
+    @RequirePermission("contract:delete")
+    public ApiResponse<Void> cancel(@PathVariable Long id) {
+        SysUser user = authService.requireUser();
+        contractService.cancel(id, user);
+        return ApiResponse.ok("合同已取消");
+    }
+
     @GetMapping("/statistics")
     @RequirePermission("contract:view")
     public ApiResponse<Map<String, Object>> statistics() {

@@ -80,6 +80,15 @@ public class ContractService {
     public ContractDetailView assign(Long id, AssignRequest request, SysUser operator) {
         Contract contract = getContract(id);
         requireStatus(contract, ContractStatus.DRAFT);
+        if (request.countersignUserIds() == null || request.countersignUserIds().isEmpty()) {
+            throw ApiException.badRequest("会签人员不能为空");
+        }
+        if (request.approvalUserIds() == null || request.approvalUserIds().isEmpty()) {
+            throw ApiException.badRequest("审批人员不能为空");
+        }
+        if (request.signUserIds() == null || request.signUserIds().isEmpty()) {
+            throw ApiException.badRequest("签订人员不能为空");
+        }
         request.countersignUserIds().forEach(userId -> createTask(contract, userId, TaskType.COUNTERSIGN));
         request.approvalUserIds().forEach(userId -> createTask(contract, userId, TaskType.APPROVAL));
         request.signUserIds().forEach(userId -> createTask(contract, userId, TaskType.SIGN));
@@ -174,6 +183,15 @@ public class ContractService {
         recordState(contract, contract.getStatus(), contract.getStatus(), operator, "删除合同");
     }
 
+    @Transactional
+    public void cancel(Long id, SysUser operator) {
+        Contract contract = getContract(id);
+        if (contract.getStatus() == ContractStatus.CANCELLED || contract.getStatus() == ContractStatus.SIGNED) {
+            throw ApiException.conflict("当前合同状态不允许取消");
+        }
+        changeStatus(contract, ContractStatus.CANCELLED, operator, "管理员取消合同");
+    }
+
     public Page<ContractStateHistory> logs(String keyword, int page, int size) {
         var pr = PageRequests.of(page, size);
         if (keyword == null || keyword.isEmpty()) {
@@ -186,14 +204,12 @@ public class ContractService {
     public ContractDetailView resubmit(Long id, SysUser operator) {
         Contract contract = getContract(id);
         requireStatus(contract, ContractStatus.REJECTED);
-        // Reset rejected approval tasks back to PENDING
+        // Reset all approval tasks back to PENDING (including previously DONE ones)
         List<ContractTask> approvalTasks = taskRepository.findByContractIdAndTaskType(contract.getId(), TaskType.APPROVAL);
         for (ContractTask task : approvalTasks) {
-            if (task.getTaskStatus() == TaskStatus.REJECTED) {
-                task.setTaskStatus(TaskStatus.PENDING);
-                task.setOpinion(null);
-                task.setOperatedAt(null);
-            }
+            task.setTaskStatus(TaskStatus.PENDING);
+            task.setOpinion(null);
+            task.setOperatedAt(null);
         }
         taskRepository.saveAll(approvalTasks);
         changeStatus(contract, ContractStatus.FINALIZED, operator, "重新提交审批");

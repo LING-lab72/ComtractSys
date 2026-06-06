@@ -22,6 +22,7 @@ const menuItems = [
 const sysItems = [
   { path: '/system/users', label: '用户管理', icon: UserCog, permission: 'user:manage' },
   { path: '/system/roles', label: '角色管理', icon: ShieldCheck, permission: 'role:manage' },
+  { path: '/system/permissions', label: '权限管理', icon: ShieldCheck, permission: 'permission:manage' },
   { path: '/system/logs', label: '操作日志', icon: ScrollText, permission: 'log:view' },
 ]
 
