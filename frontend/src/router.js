@@ -37,7 +37,7 @@ const router = createRouter({
         { path: 'contracts/query', component: ContractQueryView, meta: { title: '合同查询', permission: 'log:view' } },
         { path: 'contracts/:id', component: ContractDetailView, meta: { title: '合同详情', permission: 'contract:view' } },
         { path: 'customers', component: CustomerListView, meta: { title: '客户管理', permission: 'customer:manage' } },
-        { path: 'tasks', component: MyTasksView, meta: { title: '我的待办', permission: ['contract:countersign', 'contract:approve', 'contract:sign', 'contract:update'] } },
+        { path: 'tasks', component: MyTasksView, meta: { title: '我的待办', permission: ['contract:countersign', 'contract:approve', 'contract:sign', 'contract:update', 'contract:assign'] } },
         { path: 'system/users', component: UserManagementView, meta: { title: '用户管理', permission: 'user:manage' } },
         { path: 'system/roles', component: RoleManagementView, meta: { title: '角色管理', permission: 'role:manage' } },
         { path: 'system/permissions', component: PermissionManagementView, meta: { title: '权限管理', permission: 'permission:manage' } },

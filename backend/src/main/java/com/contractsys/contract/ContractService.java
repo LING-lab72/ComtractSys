@@ -74,10 +74,19 @@ public class ContractService {
                 .map(ContractView::from);
     }
 
-    public ContractDetailView detail(Long id) {
+    public ContractDetailView detail(Long id, SysUser currentUser) {
         Contract contract = getContract(id);
+        requireContractAccess(contract, currentUser);
         List<TaskView> tasks = taskRepository.findByContractIdOrderByCreatedAtAsc(id).stream().map(TaskView::from).toList();
         return new ContractDetailView(ContractView.from(contract), tasks);
+    }
+
+    /** 校验当前用户是否有权访问该合同（起草人/被分配人/管理员） */
+    public void requireContractAccess(Contract contract, SysUser user) {
+        if (authService.hasPermission(user, "log:view")) return;
+        if (contract.getDrafter().getId().equals(user.getId())) return;
+        if (taskRepository.existsByContractAndAssignee(contract, user)) return;
+        throw ApiException.forbidden("无权访问该合同");
     }
 
     @Transactional
@@ -118,7 +127,7 @@ public class ContractService {
         request.approvalUserIds().forEach(userId -> createTask(contract, userId, TaskType.APPROVAL));
         request.signUserIds().forEach(userId -> createTask(contract, userId, TaskType.SIGN));
         changeStatus(contract, ContractStatus.ASSIGNED, operator, "管理员分配合同流程人员");
-        return detail(id);
+        return detail(id, operator);
     }
 
     public List<TaskView> myTasks(SysUser user) {
@@ -153,7 +162,7 @@ public class ContractService {
         if (!taskRepository.existsByContractIdAndTaskTypeAndTaskStatus(id, TaskType.COUNTERSIGN, TaskStatus.PENDING)) {
             changeStatus(contract, ContractStatus.COUNTERSIGNED, operator, "全部会签完成");
         }
-        return detail(id);
+        return detail(id, operator);
     }
 
     @Transactional
@@ -165,7 +174,7 @@ public class ContractService {
         }
         contract.setContent(request.content());
         changeStatus(contract, ContractStatus.FINALIZED, operator, "起草人定稿");
-        return detail(id);
+        return detail(id, operator);
     }
 
     @Transactional
@@ -179,7 +188,7 @@ public class ContractService {
         } else if (!taskRepository.existsByContractIdAndTaskTypeAndTaskStatus(id, TaskType.APPROVAL, TaskStatus.PENDING)) {
             changeStatus(contract, ContractStatus.APPROVED, operator, "全部审批通过");
         }
-        return detail(id);
+        return detail(id, operator);
     }
 
     @Transactional
@@ -192,7 +201,7 @@ public class ContractService {
         if (!taskRepository.existsByContractIdAndTaskTypeAndTaskStatus(id, TaskType.SIGN, TaskStatus.PENDING)) {
             changeStatus(contract, ContractStatus.SIGNED, operator, "合同签订完成");
         }
-        return detail(id);
+        return detail(id, operator);
     }
 
     @Transactional
@@ -258,7 +267,7 @@ public class ContractService {
         }
         taskRepository.saveAll(approvalTasks);
         changeStatus(contract, ContractStatus.FINALIZED, operator, "重新提交审批");
-        return detail(id);
+        return detail(id, operator);
     }
 
     public byte[] exportLogs(String keyword) throws Exception {

@@ -63,8 +63,8 @@ public class ContractController {
     @GetMapping("/contracts/{id}")
     @RequirePermission("contract:view")
     public ApiResponse<ContractDetailView> detail(@PathVariable Long id) {
-        authService.requireUser();
-        return ApiResponse.ok(contractService.detail(id));
+        SysUser user = authService.requireUser();
+        return ApiResponse.ok(contractService.detail(id, user));
     }
 
     @PostMapping("/contracts")
@@ -166,6 +166,7 @@ public class ContractController {
                                                               @RequestParam("file") MultipartFile file) {
         SysUser user = authService.requireUser();
         Contract contract = contractService.getContract(id);
+        contractService.requireContractAccess(contract, user);
         FileStorageService.StoredFile stored = fileStorageService.store(file);
         Attachment attachment = new Attachment();
         attachment.setContract(contract);
@@ -181,7 +182,9 @@ public class ContractController {
     @GetMapping("/contracts/{id}/attachments")
     @RequirePermission("contract:view")
     public ApiResponse<List<Map<String, Object>>> listAttachments(@PathVariable Long id) {
-        authService.requireUser();
+        SysUser user = authService.requireUser();
+        Contract contract = contractService.getContract(id);
+        contractService.requireContractAccess(contract, user);
         List<Map<String, Object>> list = attachmentRepository.findByContractIdOrderByUploadedAtDesc(id).stream()
                 .map(a -> Map.<String, Object>of(
                         "id", a.getId(),
@@ -196,9 +199,10 @@ public class ContractController {
     @GetMapping("/attachments/{id}/download")
     @RequirePermission("contract:view")
     public ResponseEntity<Resource> downloadAttachment(@PathVariable Long id) {
-        authService.requireUser();
+        SysUser user = authService.requireUser();
         Attachment attachment = attachmentRepository.findById(id)
                 .orElseThrow(() -> com.contractsys.common.ApiException.notFound("附件不存在"));
+        contractService.requireContractAccess(attachment.getContract(), user);
         Path filePath = fileStorageService.resolve(attachment.getStoredName());
         if (!Files.exists(filePath)) {
             throw com.contractsys.common.ApiException.notFound("附件文件不存在");
@@ -214,9 +218,10 @@ public class ContractController {
     @DeleteMapping("/attachments/{id}")
     @RequirePermission("contract:update")
     public ApiResponse<Void> deleteAttachment(@PathVariable Long id) {
-        authService.requireUser();
+        SysUser user = authService.requireUser();
         Attachment attachment = attachmentRepository.findById(id)
                 .orElseThrow(() -> com.contractsys.common.ApiException.notFound("附件不存在"));
+        contractService.requireContractAccess(attachment.getContract(), user);
         try {
             Files.deleteIfExists(fileStorageService.resolve(attachment.getStoredName()));
         } catch (IOException ignored) {}
